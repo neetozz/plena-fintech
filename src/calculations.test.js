@@ -1,0 +1,10 @@
+﻿import test from 'node:test';
+import assert from 'node:assert/strict';
+import {calculateGoal,summarize,transactions} from './calculations.js';
+test('redondea hacia arriba meses y calcula pendiente',()=>assert.deepEqual(calculateGoal(5000,1200,300),{remaining:3800,months:13,progress:24}));
+test('objetivo alcanzado y superado',()=>{assert.equal(calculateGoal(100,100,0).months,0);assert.equal(calculateGoal(100,150,0).remaining,0)});
+test('aporte cero no promete fecha',()=>assert.equal(calculateGoal(100,0,0).months,null));
+test('rechaza negativos, cero objetivo, NaN e infinito',()=>{for(const args of [[0,0,0],[10,-1,1],[10,1,-1],[NaN,0,1],[Infinity,0,1],[1e10,0,1]])assert.ok(calculateGoal(...args).error)});
+test('precisión decimal',()=>assert.equal(calculateGoal(.3,.1,.1).months,2));
+test('totales consistentes por período',()=>{assert.deepEqual(summarize(transactions.filter(t=>t.month==='Octubre')),{income:3250,expenses:200,net:3050});assert.deepEqual(summarize(transactions.filter(t=>t.month==='Septiembre')),{income:1800,expenses:220,net:1580})});
+test('rechaza fracciones menores a un centavo',()=>assert.ok(calculateGoal(10,0,.001).error));
