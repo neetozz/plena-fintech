@@ -4,10 +4,13 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 const bundle=await build({entryPoints:['src/main.jsx'],bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"development"'}});
 const tick=()=>new Promise(r=>setTimeout(r,20));
-async function mount(){
- const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',{url:'http://localhost:5175/',runScripts:'outside-only',pretendToBeVisual:true});
+async function mount({hash='',fontsReady=Promise.resolve()}={}){
+ const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',{url:'http://localhost:5175/'+hash,runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window;
  w.matchMedia=()=>({matches:false});
+ const scrollCalls=[];
+ w.Element.prototype.scrollIntoView=function(options){scrollCalls.push({id:this.id,...options})};
+ Object.defineProperty(w.document,'fonts',{value:{ready:fontsReady}});
  // jsdom no implementa el top layer. Este sustituto sólo permite probar React;
  // no se usa para afirmar foco atrapado, Escape nativo ni layout real.
  w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};
@@ -16,7 +19,7 @@ async function mount(){
  const button=text=>[...d.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
  async function click(text){const b=button(text);assert.ok(b,`Existe botón: ${text}`);b.click();await tick();return b}
  async function input(id,value){const el=d.getElementById(id);assert.ok(el,id);Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new w.Event('input',{bubbles:true}));await tick()}
- return {dom,w,d,button,click,input};
+ return {dom,w,d,button,click,input,scrollCalls};
 }
 test('DOM: navegación, filtros y período comparten el saldo',async()=>{
  const h=await mount();try{
@@ -71,5 +74,42 @@ test('DOM: tarjeta original conserva giro, acabados y congelado',async()=>{
  for(const finish of ['hueso','cobalto','grafito']){h.d.querySelector(`[aria-label="Acabado ${finish}"]`).click();await tick();assert.ok(h.d.querySelector(`.payment-card.${finish}`));assert.equal(h.d.querySelector(`[aria-label="Acabado ${finish}"]`).getAttribute('aria-pressed'),'true')}
  const freeze=h.d.querySelector('[role="switch"]');freeze.click();await tick();assert.equal(freeze.getAttribute('aria-checked'),'true');assert.ok(h.d.querySelector('.payment-card.frozen'));freeze.click();await tick();assert.equal(freeze.getAttribute('aria-checked'),'false');
  await h.click('↻ Ver frente');assert.equal(h.d.querySelector('.payment-card.is-back'),null);
+ }finally{h.dom.window.close()}
+});
+test('DOM: anclas funcionales únicas y cierre del menú antes de la navegación nativa',async()=>{
+ const h=await mount();try{
+ const ids=[...h.d.querySelectorAll('[id]')].map(el=>el.id);assert.equal(new Set(ids).size,ids.length);
+ assert.ok(h.d.getElementById('demo').matches('.connected-dashboard'));
+ assert.ok(h.d.getElementById('tarjeta').matches('.card-composition'));
+ assert.ok(h.d.getElementById('simulador').matches('.simulator'));
+ assert.ok(h.d.querySelector('#simulador .simulator-title'));
+ assert.ok(h.d.querySelector('#simulador .goal-picker'));
+ assert.ok(h.d.querySelector('#simulador .goal-fields'));
+ for(const a of h.d.querySelectorAll('.nav-links a,.mobile-navigation-links a,.nav-cta,.primary-button,.closing a')){
+  assert.ok(h.d.querySelector(a.getAttribute('href')),a.textContent);
+ }
+ const menu=h.d.querySelector('.mobile-navigation');menu.open=true;
+ const link=menu.querySelector('a');let closedBeforeDefault=false;
+ link.addEventListener('click',()=>{}, {once:true});
+ h.d.addEventListener('click',e=>{if(e.target===link)closedBeforeDefault=!menu.open&&!e.defaultPrevented},{once:true});
+ link.click();await tick();assert.equal(closedBeforeDefault,true);
+ menu.open=true;menu.querySelector('summary').dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);assert.equal(h.d.activeElement,menu.querySelector('summary'));
+ }finally{h.dom.window.close()}
+});
+test('DOM: hash inicial se alinea tras React y fuentes sin interrumpir desplazamiento manual',async()=>{
+ for(const hash of ['#demo','#simulador','#metas','#tarjeta']){
+  let ready;const fontsReady=new Promise(r=>ready=r);const h=await mount({hash,fontsReady});
+  try{assert.equal(h.scrollCalls.length,1);assert.equal(h.scrollCalls[0].id,hash.slice(1));assert.equal(h.scrollCalls[0].behavior,'instant');ready();await tick();assert.equal(h.scrollCalls.length,2)}finally{h.dom.window.close()}
+ }
+ let ready;const h=await mount({hash:'#demo',fontsReady:new Promise(r=>ready=r)});
+ try{h.w.dispatchEvent(new h.w.Event('wheel'));ready();await tick();assert.equal(h.scrollCalls.length,1)}finally{h.dom.window.close()}
+});
+test('DOM: activar el mismo hash vuelve al destino y respeta movimiento reducido',async()=>{
+ const h=await mount({hash:'#demo'});try{
+ h.w.matchMedia=()=>({matches:true});
+ const link=h.d.querySelector('.nav-cta');const before=h.scrollCalls.length;
+ const event=new h.w.MouseEvent('click',{bubbles:true,cancelable:true,button:0});link.dispatchEvent(event);
+ assert.equal(event.defaultPrevented,true);assert.equal(h.scrollCalls.length,before+1);assert.equal(h.scrollCalls.at(-1).behavior,'instant');assert.equal(h.d.activeElement.id,'demo');
+ const modified=new h.w.MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true});link.dispatchEvent(modified);assert.equal(modified.defaultPrevented,false);
  }finally{h.dom.window.close()}
 });

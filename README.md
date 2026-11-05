@@ -25,7 +25,7 @@ La compilación estática queda en `dist/`.
 ## Experiencia
 
 - Se conserva el inicio, la paleta, el logo, la navegación de vidrio y la tarjeta CSS/SVG original: giro, inclinación, tres acabados y congelado.
-- **Tu espacio** tiene tres vistas mediante botones accesibles: Resumen (saldo, gráfico y tres movimientos recientes), Movimientos (historial y filtros) y Metas (progreso compartido con el simulador). La ventana conserva su altura al navegar; el contenido extenso tiene desplazamiento interno.
+- **Tu espacio** tiene tres vistas mediante botones accesibles: Resumen (saldo, gráfico y tres movimientos recientes), Movimientos (historial y filtros) y Metas (progreso compartido con el simulador). La ventana conserva una altura mínima al navegar y crece con el contenido. El resumen y el historial usan el scroll de la página, sin paneles que recorten o atrapen la rueda.
 - **Una fuente de estado** en React (`DemoContext.jsx` y `demo.js`) reúne movimientos, período, vistas, filtros, metas y comprobante. Saldo, ingresos, gastos y puntos del gráfico se derivan de ese estado, con centavos enteros.
 - **Transferir** abre un diálogo nativo con tres destinatarios ficticios, avatares de iniciales, monto y concepto opcional. Primero se revisan destinatario, período y saldo resultante; luego se confirma explícitamente. Se informa antes de confirmar: «Demostración: no se envía dinero».
 - Se rechazan montos no positivos, formatos inválidos, más de dos decimales y saldo insuficiente. La validación se repite al confirmar. Un bloqueo inmediato y un identificador único evitan duplicar la operación.
@@ -37,6 +37,17 @@ La compilación estática queda en `dist/`.
 - Foco visible, controles nativos, etiquetas, indicadores de selección además del color, gestión de foco del diálogo y devolución al botón de origen. Escape solicita cierre; el diálogo nativo aporta modalidad y restricción de foco. Las confirmaciones y errores se anuncian en regiones específicas.
 - Con movimiento reducido se desactiva la inclinación y el dibujo del sello; los nuevos paneles usan una aparición de opacidad breve. Hay alternativa sólida sin `backdrop-filter`. El comprobante se entiende también sin animación.
 - La misma DM Sans se sirve ahora **localmente**, con su licencia OFL en `public/fonts/`. No se cargan fuentes externas. La app no hace fetch ni usa backend, bancos, pagos, cuentas, claves, analítica o servicios de red.
+
+## Navegación por anclas
+
+- `#demo` está en el borde del dashboard, no en el comienzo de la introducción oscura.
+- `#simulador` está en el simulador, con su título, selector de metas y primeros campos juntos. El fragmento anterior `#metas` sigue resolviendo al encabezado del simulador.
+- `#tarjeta` apunta a la composición de tarjeta y sus controles, no al titular del hero.
+- El nav es absoluto, no fijo. No se reserva altura para él: scroll-padding y scroll-margin superiores están en cero. Las introducciones y los espacios de las secciones se conservan.
+- Los enlaces mantienen navegación nativa. Sólo la repetición del mismo hash se realinea con scrollIntoView, sin cálculos de offsets; usa desplazamiento instantáneo con movimiento reducido. Los enlaces modificados (Ctrl/Cmd, etc.) mantienen su comportamiento.
+- Al cargar un hash, React alinea el destino y vuelve a comprobarlo tras cargar la fuente local. Esa segunda alineación se cancela si el usuario ya empezó a interactuar.
+- En celular hay un menú compacto de vidrio: es un desplegable absoluto, no altera el layout y se cierra sincrónicamente antes de navegar. Admite Escape y cierre al tocar fuera.
+- Las pruebas DOM verifican IDs únicos, destinos funcionales, cierre previo a la acción nativa, carga con hash, carga de fuentes, cancelación por interacción y repetición con movimiento reducido. Las pruebas reales de posición se hicieron separando activación por teclado y medición final; los clics sintéticos dentro de una evaluación larga no fueron fiables en el navegador integrado.
 
 ## Referencias consultadas
 
@@ -50,15 +61,15 @@ Consulta realizada el 4 de noviembre de 2026. Se consultaron fuentes accesibles 
 
 ## Verificación y límites
 
-- `npm test`: **21 pruebas exitosas**. Dieciséis pruebas de cálculos y estado, y cinco pruebas de integración de la interfaz en jsdom.
+- `npm test`: **24 pruebas exitosas**. Dieciséis pruebas de cálculos y estado, y ocho pruebas de integración de la interfaz en jsdom.
 - Cálculos/estado: precisión decimal, límites del simulador, las tres metas, validación y deduplicación de transferencias, saldo insuficiente al confirmar, saldo agotado, asignación al período, gráfico consistente, reinicio e inmutabilidad. Una secuencia de 100 operaciones de un centavo comprueba que no se acumula error.
 - Interfaz DOM: navegación, período y filtros; flujo de errores/revisión/confirmación; doble clic; comprobante; saldo e historial conectados; reinicio; edición y nueva demo; foco inicial y devolución al origen; evento de cancelación; metas y sincronización de slider/campo; regresión de giro, acabados y congelado de la tarjeta.
 - jsdom **no renderiza CSS ni implementa el top layer de un diálogo**. El test sustituye `showModal` únicamente para probar React. Estas pruebas no equivalen a probar Escape físico, atrapamiento de foco nativo, navegación completa por teclado, contraste, animación o tacto en un navegador real.
 - `npm run build`: exitoso. Sólo React y React DOM como dependencias de producción; esbuild y jsdom son herramientas de pruebas en desarrollo.
 - Servidor local en `http://localhost:5175/`, puerto estricto. Respuesta HTTP y módulos de Plena verificados.
-- **Pendiente de revisión visual real a 360, 390, 768 y 1440 px**: desbordamientos, legibilidad, recortes, scroll interno, contraste renderizado y comportamiento táctil. Se implementaron estilos responsivos, pero no se afirma que esas dimensiones hayan sido comprobadas en navegador.
-- Se intentó acceder al navegador: la herramienta devolvió `The browser access host is unavailable`. Luego se intentó Computer Use con la ventana Brave disponible; la herramienta detuvo el acceso porque no pudo determinar la URL actual en Windows con suficiente confianza para aplicar su política. No se continuó con automatización de esa ventana. También quedan pendientes las verificaciones nativas de teclado/Escape, foco atrapado, movimiento reducido y alternativa sin blur.
-- Todos los datos son ilustrativos y temporales. No hay envío de dinero, comprobante financiero válido ni recomendaciones. No se hizo push ni publicación de esta segunda versión.
+- Revisión de anclas del 5 de noviembre de 2026 en el navegador integrado de Orca: 390 × 844, 768 × 1024 y 1440 × 900. Se activaron los enlaces desde arriba y abajo, también repetidos, y se midió la posición final: borde superior a menos de 1 px, controles visibles y sin desbordamiento horizontal. Se revisaron capturas de dashboard y simulador. El motor necesitó capturas con escala reducida en las vistas grandes; las dimensiones de layout siguieron siendo las indicadas. Queda pendiente 360 px y una auditoría integral de contraste/tacto, fuera del alcance de esta corrección.
+- El conector de navegador externo continúa indisponible. La revisión actual usó el navegador integrado mediante orca-cli. Se comprobó activación por Enter, carga directa/recarga con hash, cierre del menú al seguir enlaces y propagación del scroll a la página (300 px de desplazamiento exterior, scroll interno en cero). El movimiento reducido de las anclas está cubierto por prueba DOM; su emulación visual, el foco atrapado del diálogo financiero y la alternativa sin blur siguen pendientes de auditoría integral.
+- Todos los datos son ilustrativos y temporales. No hay envío de dinero, comprobante financiero válido ni recomendaciones. No se hizo push ni publicación de esta corrección de navegación.
 
 ## Asistencia de IA
 
